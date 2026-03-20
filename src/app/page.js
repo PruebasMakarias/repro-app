@@ -1,5 +1,6 @@
 "use client"
-import { useState } from "react"
+import { supabase } from "../lib/supabaseClient"
+import { useEffect, useState } from "react"
 
 export default function Home() {
   const [cliente, setCliente] = useState("")
@@ -8,26 +9,62 @@ export default function Home() {
   const [precio, setPrecio] = useState(0)
   const [lineas, setLineas] = useState([])
 
-  const añadirLinea = () => {
+  // Cargar presupuestos desde Supabase al iniciar la app
+  useEffect(() => {
+    const fetchPresupuestos = async () => {
+      const { data, error } = await supabase
+        .from("presupuestos")
+        .select("*")
+        .order("created_at", { ascending: true })
+      
+      if (error) console.log("Error al cargar:", error)
+      else setLineas(data)
+    }
+
+    fetchPresupuestos()
+  }, [])
+
+  // Añadir línea y guardar en Supabase
+  const añadirLinea = async () => {
     if (!producto || cantidad <= 0 || precio <= 0) return
 
     const nuevaLinea = {
+      cliente,
       producto,
       cantidad,
       precio,
       total: cantidad * precio
     }
 
-    setLineas([...lineas, nuevaLinea])
+    const { data, error } = await supabase
+      .from("presupuestos")
+      .insert([nuevaLinea])
+      .select()
+    
+    if (error) {
+      console.log("Error al guardar:", error)
+      return
+    }
 
+    setLineas([...lineas, data[0]])
     setProducto("")
     setCantidad(1)
     setPrecio(0)
   }
 
-  const eliminarLinea = (index) => {
-    const nuevasLineas = lineas.filter((_, i) => i !== index)
-    setLineas(nuevasLineas)
+  // Eliminar línea de Supabase y actualizar estado
+  const eliminarLinea = async (id) => {
+    const { error } = await supabase
+      .from("presupuestos")
+      .delete()
+      .eq("id", id)
+    
+    if (error) {
+      console.log("Error al eliminar:", error)
+      return
+    }
+
+    setLineas(lineas.filter((linea) => linea.id !== id))
   }
 
   const totalPresupuesto = lineas.reduce(
@@ -99,9 +136,9 @@ export default function Home() {
             <p className="text-gray-500">No hay productos aún</p>
           ) : (
             <ul className="space-y-2">
-              {lineas.map((linea, index) => (
+              {lineas.map((linea) => (
                 <li
-                  key={index}
+                  key={linea.id}
                   className="flex justify-between items-center bg-gray-50 p-2 rounded-lg"
                 >
                   <span>
@@ -114,7 +151,7 @@ export default function Home() {
                     </span>
 
                     <button
-                      onClick={() => eliminarLinea(index)}
+                      onClick={() => eliminarLinea(linea.id)}
                       className="text-red-500 hover:text-red-700"
                     >
                       ❌
