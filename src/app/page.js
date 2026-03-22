@@ -4,173 +4,113 @@ import { useEffect, useState } from "react"
 
 export default function Home() {
   const [cliente, setCliente] = useState("")
-  const [producto, setProducto] = useState("")
+  const [productos, setProductos] = useState([])
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null)
   const [cantidad, setCantidad] = useState(1)
-  const [precio, setPrecio] = useState(0)
   const [lineas, setLineas] = useState([])
 
-  // Cargar presupuestos desde Supabase al iniciar la app
   useEffect(() => {
-    const fetchPresupuestos = async () => {
-      const { data, error } = await supabase
+    const fetchProductos = async () => {
+      const { data } = await supabase.from("productos").select("*")
+      setProductos(data || [])
+    }
+    fetchProductos()
+  }, [])
+
+  useEffect(() => {
+    const fetchLineas = async () => {
+      const { data } = await supabase
         .from("presupuestos")
         .select("*")
         .order("created_at", { ascending: true })
-      
-      if (error) console.log("Error al cargar:", error)
-      else setLineas(data)
+      setLineas(data || [])
     }
-
-    fetchPresupuestos()
+    fetchLineas()
   }, [])
 
-  // Añadir línea y guardar en Supabase
   const añadirLinea = async () => {
-    if (!producto || cantidad <= 0 || precio <= 0) return
+    if (!productoSeleccionado || !cliente) return
 
-    const nuevaLinea = {
-      cliente,
-      producto,
-      cantidad,
-      precio,
-      total: cantidad * precio
-    }
+    const precio = productoSeleccionado.precio_venta
+    const total = precio * cantidad
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("presupuestos")
-      .insert([nuevaLinea])
+      .insert([{
+        cliente,
+        producto: productoSeleccionado.nombre,
+        cantidad,
+        precio,
+        total
+      }])
       .select()
-    
-    if (error) {
-      console.log("Error al guardar:", error)
-      return
-    }
 
     setLineas([...lineas, data[0]])
-    setProducto("")
-    setCantidad(1)
-    setPrecio(0)
   }
 
-  // Eliminar línea de Supabase y actualizar estado
-  const eliminarLinea = async (id) => {
-    const { error } = await supabase
-      .from("presupuestos")
-      .delete()
-      .eq("id", id)
-    
-    if (error) {
-      console.log("Error al eliminar:", error)
-      return
-    }
-
-    setLineas(lineas.filter((linea) => linea.id !== id))
-  }
-
-  const totalPresupuesto = lineas.reduce(
-    (acc, linea) => acc + linea.total,
-    0
-  )
+  const total = lineas.reduce((acc, l) => acc + l.total, 0)
 
   return (
-    <main className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-      <div className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-2xl">
-        
-        <h1 className="text-2xl font-bold mb-4">🧾 Presupuesto</h1>
+    <div className="max-w-4xl mx-auto">
 
-        {/* Cliente */}
-        <div className="mb-4">
-          <label className="block mb-1 font-medium">Cliente</label>
+      <h1 className="text-3xl font-bold mb-6">Nuevo presupuesto</h1>
+
+      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+
+        <input
+          className="w-full border p-2 rounded"
+          placeholder="Cliente"
+          value={cliente}
+          onChange={(e) => setCliente(e.target.value)}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <select
+            className="border p-2 rounded"
+            onChange={(e) =>
+              setProductoSeleccionado(
+                productos.find(p => p.id === Number(e.target.value))
+              )
+            }
+          >
+            <option>Selecciona producto</option>
+            {productos.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+
           <input
-            className="w-full border rounded-lg p-2"
-            type="text"
-            placeholder="Nombre del cliente"
-            value={cliente}
-            onChange={(e) => setCliente(e.target.value)}
+            type="number"
+            className="border p-2 rounded"
+            value={cantidad}
+            onChange={(e) => setCantidad(Number(e.target.value))}
           />
         </div>
 
-        {/* Añadir producto */}
-        <div className="mb-4">
-          <h2 className="font-semibold mb-2">Añadir producto</h2>
-
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              className="border rounded-lg p-2"
-              type="text"
-              placeholder="Producto"
-              value={producto}
-              onChange={(e) => setProducto(e.target.value)}
-            />
-
-            <input
-              className="border rounded-lg p-2"
-              type="number"
-              placeholder="Cantidad"
-              value={cantidad}
-              onChange={(e) => setCantidad(Number(e.target.value))}
-            />
-
-            <input
-              className="border rounded-lg p-2"
-              type="number"
-              placeholder="Precio"
-              value={precio}
-              onChange={(e) => setPrecio(Number(e.target.value))}
-            />
-          </div>
-
-          <button
-            onClick={añadirLinea}
-            className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            ➕ Añadir
-          </button>
-        </div>
-
-        {/* Lista de productos */}
-        <div className="mb-4">
-          <h2 className="font-semibold mb-2">Productos</h2>
-
-          {lineas.length === 0 ? (
-            <p className="text-gray-500">No hay productos aún</p>
-          ) : (
-            <ul className="space-y-2">
-              {lineas.map((linea) => (
-                <li
-                  key={linea.id}
-                  className="flex justify-between items-center bg-gray-50 p-2 rounded-lg"
-                >
-                  <span>
-                    {linea.producto} - {linea.cantidad} x {linea.precio} €
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">
-                      {linea.total} €
-                    </span>
-
-                    <button
-                      onClick={() => eliminarLinea(linea.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ❌
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Total */}
-        <div className="text-right">
-          <h2 className="text-xl font-bold">
-            Total: {totalPresupuesto} €
-          </h2>
-        </div>
-
+        <button
+          onClick={añadirLinea}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+        >
+          Añadir producto
+        </button>
       </div>
-    </main>
+
+      {/* Lista */}
+      <div className="mt-6 bg-white p-4 rounded-xl shadow">
+        {lineas.map(l => (
+          <div key={l.id} className="flex justify-between border-b py-2">
+            <span>{l.producto} x{l.cantidad}</span>
+            <span>{l.total} €</span>
+          </div>
+        ))}
+
+        <div className="text-right font-bold mt-4">
+          Total: {total} €
+        </div>
+      </div>
+
+    </div>
   )
 }
