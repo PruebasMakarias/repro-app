@@ -1,8 +1,11 @@
 "use client"
+
 import { supabase } from "../lib/supabaseClient"
 import { useEffect, useState } from "react"
 
 export default function Home() {
+
+  // 🔹 ESTADOS
   const [cliente, setCliente] = useState("")
   const [productos, setProductos] = useState([])
   const [productoSeleccionado, setProductoSeleccionado] = useState(null)
@@ -10,19 +13,25 @@ export default function Home() {
   const [lineas, setLineas] = useState([])
   const [presupuestoId, setPresupuestoId] = useState(null)
 
-  // 🔹 Cargar productos
+  // 🔹 CARGAR PRODUCTOS
   useEffect(() => {
-    console.log("PRODUCTOS:", productos)
     const fetchProductos = async () => {
-      const { data, error } = await supabase.from("productos").select("*")
-      if (error) console.error(error)
-      else setProductos(data || [])
+      const { data, error } = await supabase
+        .from("productos")
+        .select("*")
+
+      if (error) {
+        console.error("Error cargando productos:", error)
+      } else {
+        console.log("PRODUCTOS:", data)
+        setProductos(data || [])
+      }
     }
 
     fetchProductos()
   }, [])
 
-  // 🔹 Crear presupuesto (UNA SOLA VEZ)
+  // 🔹 CREAR PRESUPUESTO (SOLO UNA VEZ)
   const crearPresupuesto = async () => {
     if (!cliente) {
       alert("Introduce un cliente")
@@ -42,7 +51,7 @@ export default function Home() {
     setPresupuestoId(data[0].id)
   }
 
-  // 🔹 Añadir producto al presupuesto
+  // 🔹 AÑADIR PRODUCTO
   const añadirLinea = async () => {
     if (!productoSeleccionado || !presupuestoId) {
       alert("Selecciona producto y crea presupuesto primero")
@@ -71,7 +80,7 @@ export default function Home() {
     setLineas([...lineas, data[0]])
   }
 
-  // 🔴 Eliminar línea
+  // 🔴 ELIMINAR LÍNEA
   const eliminarLinea = async (id) => {
     const { error } = await supabase
       .from("lineas_presupuesto")
@@ -86,7 +95,7 @@ export default function Home() {
     setLineas(lineas.filter(l => l.id !== id))
   }
 
-  // 🔹 Confirmar presupuesto
+  // 🔹 CONFIRMAR PRESUPUESTO
   const confirmarPresupuesto = async () => {
     if (!presupuestoId) return
 
@@ -106,6 +115,8 @@ export default function Home() {
     setCliente("")
     setLineas([])
     setPresupuestoId(null)
+    setProductoSeleccionado(null)
+    setCantidad(1)
   }
 
   const total = lineas.reduce((acc, l) => acc + l.total, 0)
@@ -142,14 +153,17 @@ export default function Home() {
 
           <select
             className="border p-2 rounded w-full"
-            onChange={(e) =>
-              setProductoSeleccionado(
-                productos.find(p => p.id === Number(e.target.value))
+            value={productoSeleccionado?.id || ""}
+            onChange={(e) => {
+              const producto = productos.find(
+                p => p.id === Number(e.target.value)
               )
-            }
+              setProductoSeleccionado(producto)
+            }}
           >
             <option value="">Selecciona producto</option>
-            {productos.map(p => (
+
+            {(productos || []).map(p => (
               <option key={p.id} value={p.id}>
                 {p.nombre} - {p.precio_venta} €
               </option>
@@ -170,7 +184,7 @@ export default function Home() {
             Añadir producto
           </button>
 
-          {/* LISTA DE PRODUCTOS */}
+          {/* LISTA */}
           <div className="mt-4">
             {lineas.map(l => (
               <div key={l.id} className="flex justify-between border-b py-2">
@@ -194,7 +208,6 @@ export default function Home() {
             Total: {total} €
           </div>
 
-          {/* 🔴 CONFIRMAR */}
           <button
             onClick={confirmarPresupuesto}
             className="w-full bg-green-700 text-white py-2 rounded mt-4"
