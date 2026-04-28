@@ -12,6 +12,7 @@ export default function Home() {
 
   // 🔹 Cargar productos
   useEffect(() => {
+    console.log("PRODUCTOS:", productos)
     const fetchProductos = async () => {
       const { data, error } = await supabase.from("productos").select("*")
       if (error) console.error(error)
